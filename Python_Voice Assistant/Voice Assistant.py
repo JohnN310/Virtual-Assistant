@@ -12,17 +12,13 @@ import wikipedia
 import webbrowser
 import ctypes
 import winshell
+import pyjokes
+import subprocess
+import smtplib
+import requests
+import json
 
 warnings.filterwarnings("ignore")
-
-# Suppress welcome message
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-
-# Initialize pygame
-pygame.init()
-
-# Initialize pygame mixer
-pygame.mixer.init()
 
 engine = pyttsx3.init()
 voices=engine.getProperty('voices')
@@ -141,6 +137,21 @@ def startup_sound():
     pygame.mixer.Sound("startup.mp3").play()
     pygame.time.delay(2000)
 
+def note(text):
+    file_name = "note"+"-note.txt"
+    with open(file_name, "w") as f:
+        f.write(text)
+    subprocess.Popen(["notepad.exe",file_name])
+
+
+def send_email(to, content):
+    sever=smtplib.SMTP("smtp.gmail.com", 587)
+    sever.ehlo()
+    sever.starttls()
+    server.login("email", "password")
+    sever.sendmail("email", to, content)
+    sever.close()
+
 # Main program
 count=0
 startup_sound()
@@ -254,30 +265,94 @@ while True:
                 ctypes.windll.user32.SystemParametersInfoW(20, 0, randomImg, 0)
                 speak = "Changed background sucessfully"
 
-            elif "play music" in text or "play song" in text:
+            elif "play music" in text or "play a song" in text or "song" in text:
                 music_dir = r"C://Users//anhkh//Downloads//GitHub//Python_Voice Assistant//Music Folder"
                 songs = os.listdir(music_dir)
                 d = random.choice(songs)
                 randomSong = os.path.join(music_dir, d)
                 playsound.playsound(randomSong)
+                response("How was it? Do you like the song?")
+                if "yes" in text: 
+                    speak = "That's good to hear. What else can I help you with?"
+                if "no" in text: 
+                    speak = "Ooh, I'll try better next time. What else can I help you with?"
 
             elif "empty recycle bin" in text:
                 winshell.recycle_bin().empty(confirm = True, show_progress=False, sound=True)
                 speak = "Emptied recycle bin"
+
+            elif "note" in text or "take notes" in text or "remember" in text:
+                response("What would you like me to take notes of?")
+                note_text= rec_audio()
+                note(note_text)
+                speak = "Notes taken successfully"
+
+            elif "jokes" in text or "joke" in text: 
+                speak = pyjokes.get_joke() 
+            #add more to this part 
+            
+            elif "where is" in text: 
+                ind = text.lower().split().index("is")
+                location = text.split()[ind+1:]
+                speak = "This is where " + str(location) + " is."
+                webbrowser.open("https://www.google.com/maps/place/" +"".join(location))
+
+            elif "email to" in text or "write an email" in text: 
+                try: 
+                    response("What should I say?")
+                    content = rec_audio()
+                    response("Enter the receiver's email address: ")
+                    to = input("Enter: ")
+                    send_email(to, content)
+                    speak = "Email has been sent"
+                except Exception as e:
+                    print(e)
+                    response("Unable to send the email")
+
+            elif "weather" in text: 
+                key="e4ba798f88bdd74531428e6735ebe711"
+                ind = text.lower().split().index("in")
+                city = text.split()[ind+1:]
+                endpoint = f"http://api.weatherstack.com/current?access_key={key}&query={city}"
+                weatherstack_response = requests.get(endpoint)
+                if weatherstack_response.status_code == 200:
+                    data = weatherstack_response.json()
+                    response("The weather in " + str(city) +", " +str(data["location"]["country"]) + " is " + str(data["current"]["temperature"])+ " Celcius degrees. The sky is currently "+ str(data["current"]["weather_descriptions"][0])+" with humidity of " + str(data["current"]["humidity"]))
+                    response("Do you want to hear more?")
+                    text1= rec_audio()
+                    if "yes" in text1:
+                        speak = "In "+str(city)+", the windspeed is "+str(data["current"]["wind_speed"])+", the pressure is "+str(data["current"]["pressure"])+" and the UV index is "+str(data["current"]["uv_index"])+". What else can I help you with?"
+                    if "no" in text1:
+                        speak = "Great. What else can I help you with?"
+
+            elif "news" in text or "News" in text: 
+                url = ('https://newsapi.org/v2/everything?q=us&from=2023-11-09&sortBy=publishedAt&apiKey=3e08910778ea403aa5649faab8fbb916')
+                try: 
+                    news_response = requests.get(url)
+
+                except:
+                    response("Please check your connection")
+                
+                news = json.loads(news_response.text)
+
+                for new in news["articles"]:
+                    response(str(new["title"]))
+                    response(str(new["description"]))
+
+                speak = "what else can I help you with?"
+            # control the news flow
 
             elif "go to sleep" in text:
                 shutdown_sound()
                 break 
         else:
             if count==0:
-                speak = "Sorry, I don't get that. Can you say it one more time?"                    
+                speak = "Sorry, I didn't get that. Can you say it one more time?"                    
                 count+=1
             else:
                 speak = "Sorry, I don't know that, I need to be programmed to understand this. What else can I help you with?"           
         response(speak)
 
     except:
-        response("I don't know that")
+        response("Something went wrong. Please try again.")
         break
-
-

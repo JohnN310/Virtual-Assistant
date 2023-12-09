@@ -1,36 +1,14 @@
-# import pygame
-# import os
+import requests
+import json
 
-# # Initialize pygame
-# pygame.init()
+url = 'https://newsapi.org/v2/everything?q=tesla&from=2023-11-09&sortBy=publishedAt&apiKey=3e08910778ea403aa5649faab8fbb916'
 
-# # Initialize pygame mixer
-# pygame.mixer.init()
+response = requests.get(url)
 
-# def turnon_sound():
-#     try:
-#         pygame.mixer.music.load("startup.mp3")
-#         pygame.mixer.music.play()
-#     except pygame.error as e:
-#         print(f"Error loading or playing the sound: {e}")
-
-# # Call the turnon_sound function
-# turnon_sound()
-
-import pygame
-import os
-
-# Suppress welcome message
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-
-# Initialize pygame
-pygame.init()
-
-# Initialize pygame mixer
-pygame.mixer.init()
-
-# Load and play a simple sound
-pygame.mixer.Sound("startup.mp3").play()
-
-# Keep the program running for a while to allow the sound to play
-pygame.time.delay(5000)
+# Check if the request was successful (status code 200)
+if response.status_code == 200:
+    # Print the content of the response
+    print(response.text)
+else:
+    # Print an error message if the request was not successful
+    print(f"Error: {response.status_code}")
