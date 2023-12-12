@@ -1,3 +1,9 @@
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+import os.path
 import warnings 
 import pygame
 import pyttsx3
@@ -17,6 +23,7 @@ import subprocess
 import smtplib
 import requests
 import json
+import wolframalpha
 
 warnings.filterwarnings("ignore")
 
@@ -43,7 +50,7 @@ def rec_audio():
         print("You said: " + data)
 
     except sr.UnknownValueError:
-        print("Assistant could not understand the audio")
+        print(" ")
     
     except sr.RequestError as ex: 
         print("Request error from Google Speech Recognition" + ex)
@@ -111,7 +118,7 @@ def say_hello(text):
     for word in text.split():
         if word.lower() in greet:
             return random.choice(response) + "."
-    return "Hi"
+    return " "
 
 def wiki_person(text):
     list_wiki = text.split()
@@ -152,6 +159,80 @@ def send_email(to, content):
     sever.sendmail("email", to, content)
     sever.close()
 
+SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+def google_calendar(num):
+  """Shows basic usage of the Google Calendar API.
+  Prints the start and name of the next 10 events on the user's calendar.
+  """
+  creds = None
+  # The file token.json stores the user's access and refresh tokens, and is
+  # created automatically when the authorization flow completes for the first
+  # time.
+  if os.path.exists("token.json"):
+    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+  # If there are no (valid) credentials available, let the user log in.
+  if not creds or not creds.valid:
+    if creds and creds.expired and creds.refresh_token:
+      creds.refresh(Request())
+    else:
+      flow = InstalledAppFlow.from_client_secrets_file(
+          "credentials.json", SCOPES
+      )
+      creds = flow.run_local_server(port=0)
+    # Save the credentials for the next run
+    with open("token.json", "w") as token:
+      token.write(creds.to_json())
+
+  try:
+    service = build("calendar", "v3", credentials=creds)
+
+    # Call the Calendar API
+    now = datetime.datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
+    events_result = (
+        service.events()
+        .list(
+            calendarId="primary",
+            timeMin=now,
+            maxResults=num,
+            singleEvents=True,
+            orderBy="startTime",
+        )
+        .execute()
+    )
+    events = events_result.get("items", [])
+
+    if not events:
+      response("No upcoming events found.")
+      return
+
+    # Prints the start and name of the next 10 events
+    response("Getting "+ str(num) + " events: ")
+    for event in events:
+      start = event["start"].get("dateTime", event["start"].get("date"))
+      end = event["end"].get("dateTime", event["end"].get("date"))
+      start=start.split("T")
+      end = end.split("T")
+      response("On " + start[0])
+      response("From "+start[1].split("-")[0]+" to "+end[1].split("-")[0])
+      response(event["summary"])
+
+  except HttpError as error:
+    print(f"An error occurred: {error}")
+
+def wolfram_alpha_query(query):
+    base_url = "http://api.wolframalpha.com/v2/query"
+    params = {
+        "input": query,
+        "format": "plaintext",
+        "output": "JSON",
+        "appid": "JXWQV9-P9PQGYLW55",
+    }
+
+    response = requests.get(base_url, params=params)
+    data = response.json()
+
+    return data
+
 # Main program
 count=0
 startup_sound()
@@ -161,7 +242,7 @@ while True:
         text=rec_audio()
         speak=" "
         if call(text) or boo:
-            speak = speak + say_hello(text)
+            speak = say_hello(text)
             boo=True
              
             if "how" not in text and ("date" in text or "day" in text or "month" in text):
@@ -185,10 +266,10 @@ while True:
                     minute = str(now.minute)
                 speak = "It is " + str(hour) + ":" + minute + " " + meridiem
 
-            elif "who is" in text: 
-                    person =wiki_person(text)
-                    wiki = wikipedia.summary(person, sentences = 2)
-                    speak = wiki
+            # elif "who is" in text: 
+            #         person =wiki_person(text)
+            #         wiki = wikipedia.summary(person, sentences = 2)
+            #         speak = wiki
 
             elif "who are you" in text:
                 speak= "Hello, I am "+ assistant_name+ " your virtual assistant. I am here to make your life easier. Tôi có thể nói tiếng việt, puedo hablar español, and many other languages. Let me know when you need help with anything"
@@ -258,7 +339,7 @@ while True:
                 speak = "Searching "+str(search)+" on google"
 
             elif "change background" in text or "change wallpaper" in text:
-                img = r"C://Users//anhkh//Downloads//GitHub//Python_Voice Assistant//Backgrounds"
+                img = r"C://Users//anhkh//OneDrive//GitHub//Python_Voice Assistant//Backgrounds"
                 list_img=os.listdir(img)
                 img_choice=random.choice(list_img)
                 randomImg=os.path.join(img, img_choice)
@@ -266,7 +347,7 @@ while True:
                 speak = "Changed background sucessfully"
 
             elif "play music" in text or "play a song" in text or "song" in text:
-                music_dir = r"C://Users//anhkh//Downloads//GitHub//Python_Voice Assistant//Music Folder"
+                music_dir = r"C://Users//anhkh//OneDrive//GitHub//Python_Voice Assistant//Music Folder"
                 songs = os.listdir(music_dir)
                 d = random.choice(songs)
                 randomSong = os.path.join(music_dir, d)
@@ -342,16 +423,47 @@ while True:
                 speak = "what else can I help you with?"
             # control the news flow
 
+            elif "calendar" in text or "events" in text:
+                liststr = text.lower().split()
+                if "events" in text:
+                    num = liststr[-2]
+                else:
+                    num = 10
+                google_calendar(num) 
+                speak = "What else can I help you with?"
+
+            elif "what is" in text or "who is" in text or "calculate" in text:
+                result = wolfram_alpha_query(text)
+                # Process the result
+                if result["queryresult"]["success"]:
+                    pods = result["queryresult"]["pods"]
+                    if "subpods" in pods[1]:
+                        subpods = pods[1]["subpods"]
+                        for i in range(len(pods)):
+                            if pods[i].get("title") == "Result" or pods[i].get("title") == "Decimal approximation":
+                                speak = "The answer is "+ pods[i]["subpods"][0].get("plaintext")
+                            if pods[i].get("title") == "Wikipedia summary":
+                                speak = "This is what I found on wikipedia "+pods[i]["subpods"][0].get("plaintext").split(". ")[0]+". "+pods[i]["subpods"][0].get("plaintext").split(". ")[1]
+                else:
+                    print("Query was not successful. Check your input or try again.")
+                    print("Error:", result["queryresult"]["error"])
+
             elif "go to sleep" in text:
                 shutdown_sound()
                 break 
-        else:
-            if count==0:
-                speak = "Sorry, I didn't get that. Can you say it one more time?"                    
-                count+=1
+
             else:
-                speak = "Sorry, I don't know that, I need to be programmed to understand this. What else can I help you with?"           
-        response(speak)
+                if count==0:
+                    speak = "Sorry, I didn't get that. Can you say it one more time?"                    
+                    count+=1
+                else:
+                    speak = "Sorry, I don't know that, I need to be programmed to understand this. What else can I help you with?"  
+
+        elif boo==False:
+            speak = "If you need help with anything, call my name first, then let me know how I can assist you."
+                 
+        if speak  !=  " ":
+            response(speak)
 
     except:
         response("Something went wrong. Please try again.")
