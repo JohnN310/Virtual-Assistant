@@ -353,9 +353,10 @@ while True:
                 randomSong = os.path.join(music_dir, d)
                 playsound.playsound(randomSong)
                 response("How was it? Do you like the song?")
-                if "yes" in text: 
+                text1=rec_audio()
+                if "yes" in text1: 
                     speak = "That's good to hear. What else can I help you with?"
-                if "no" in text: 
+                if "no" in text1: 
                     speak = "Ooh, I'll try better next time. What else can I help you with?"
 
             elif "empty recycle bin" in text:
